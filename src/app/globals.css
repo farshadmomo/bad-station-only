@@ -1,26 +1,223 @@
 @import "tailwindcss";
 
+/* ════════════════════════════════════════════════════════════
+   BAD STATION — three colours only:
+   Warm Concrete Gray · Matte Black · Deep Crimson Red
+   all neutrals tinted warm (hue ~55) so nothing is pure #000/#fff
+   ════════════════════════════════════════════════════════════ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* matte black — warm near-black surfaces */
+  --black:    oklch(15.5% 0.006 50);
+  --black-2:  oklch(19.5% 0.008 50);
+  --black-3:  oklch(24% 0.009 52);
+
+  /* warm concrete gray — text, lines, light surfaces */
+  --concrete:     oklch(85% 0.012 70);   /* primary light text */
+  --concrete-dim: oklch(66% 0.013 65);   /* secondary text */
+  --concrete-mut: oklch(52% 0.012 60);   /* faint / disabled */
+  --line:         oklch(34% 0.011 55);   /* borders */
+  --line-bright:  oklch(44% 0.012 55);
+
+  /* deep crimson red — the only saturated colour */
+  --crimson:     oklch(48% 0.188 26);
+  --crimson-lo:  oklch(40% 0.16 26);
+  --crimson-hi:  oklch(56% 0.205 27);
+
+  --font-display: var(--font-lalezar);
+  --font-body: var(--font-vazirmatn);
+  --font-stamp: var(--font-bebas);
+
+  /* hex mirrors for GSAP (cannot tween oklch strings) */
+  --hex-crimson: #a32330;
+  --hex-concrete: #d8d2c8;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-black: var(--black);
+  --color-black-2: var(--black-2);
+  --color-black-3: var(--black-3);
+  --color-concrete: var(--concrete);
+  --color-concrete-dim: var(--concrete-dim);
+  --color-line: var(--line);
+  --color-crimson: var(--crimson);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+::selection { background: var(--crimson); color: var(--concrete); }
+
+html { scroll-behavior: auto; } /* lenis owns scroll */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--black);
+  color: var(--concrete);
+  font-family: var(--font-body), system-ui, sans-serif;
+  overflow-x: clip;
+}
+
+/* ───────── concrete photo wall — the whole site sits on this ─────────
+   fixed to the viewport so content floats over one continuous wall.
+   the beige grunge photo is darkened to a moody warm near-black. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--black);
+  background-image:
+    radial-gradient(ellipse 120% 75% at 50% -8%, oklch(36% 0.014 60 / 0.3), transparent 58%),
+    radial-gradient(ellipse 110% 85% at 50% 115%, oklch(7% 0.005 50 / 0.78), transparent 60%),
+    linear-gradient(oklch(20% 0.009 54 / 0.46), oklch(15% 0.007 50 / 0.62)),
+    url("/texture/concrete.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-blend-mode: normal, normal, multiply, normal;
+}
+
+.font-display { font-family: var(--font-display), var(--font-body), sans-serif; }
+.font-stamp {
+  font-family: var(--font-stamp), var(--font-display), sans-serif;
+  letter-spacing: 0.06em;
+}
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ───────── concrete wall lighting (transparent — reveals body wall) ─────────
+   gradient lighting only; the real photo wall shows through from body::before */
+.concrete {
+  background-color: transparent;
+  background-image:
+    radial-gradient(ellipse 60% 45% at 15% 18%, oklch(26% 0.01 55 / 0.75), transparent 60%),
+    radial-gradient(ellipse 55% 60% at 82% 10%, oklch(10% 0.006 50 / 0.85), transparent 55%),
+    radial-gradient(ellipse 45% 35% at 65% 62%, oklch(25% 0.011 58 / 0.6), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 28% 92%, oklch(10% 0.006 50 / 0.8), transparent 55%),
+    linear-gradient(115deg, transparent 42%, oklch(29% 0.011 55 / 0.4) 43%, transparent 45.5%),
+    linear-gradient(67deg,  transparent 60%, oklch(9% 0.006 50 / 0.55) 61%, transparent 64%),
+    linear-gradient(160deg, transparent 24%, oklch(28% 0.011 55 / 0.34) 25%, transparent 28.5%);
+}
+
+/* ───────── opaque textured panel (cart drawer) ─────────
+   must stay readable over the scrim, so it's its own solid concrete slab */
+.panel-wall {
+  background-color: var(--black-2);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% 0%, oklch(30% 0.012 58 / 0.5), transparent 60%),
+    linear-gradient(oklch(19% 0.008 52 / 0.76), oklch(14% 0.007 50 / 0.86)),
+    url("/texture/concrete.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-blend-mode: normal, multiply, normal;
+}
+
+/* ───────── film grain overlay ───────── */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  z-index: 90;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  opacity: 0.045;
+  animation: grain-shift 1.2s steps(4) infinite;
+}
+@keyframes grain-shift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-2%, 1.5%); }
+  50% { transform: translate(1.5%, -2%); }
+  75% { transform: translate(-1%, -1%); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ───────── spray-paint drip under بَد ───────── */
+.drip {
+  position: absolute;
+  background: var(--crimson);
+  width: 5px;
+  border-radius: 0 0 6px 6px;
+  transform-origin: top;
+}
+
+/* ───────── marquee ───────── */
+.marquee-track { display: flex; width: max-content; will-change: transform; }
+
+/* ───────── custom cursor (square — it has corners, like our mood) ───────── */
+.cursor-dot {
+  position: fixed; top: 0; left: 0;
+  width: 13px; height: 13px;
+  background: var(--crimson);
+  border-radius: 2px;
+  z-index: 200; pointer-events: none;
+  transition: transform 0.25s ease, background 0.3s;
+}
+.cursor-dot.is-hot { transform: scale(2.6); background: var(--crimson-hi); }
+@media (hover: none), (pointer: coarse) { .cursor-dot { display: none; } }
+
+/* ───────── flickering bulb ───────── */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  3% { opacity: 0.4; } 6% { opacity: 1; }
+  7% { opacity: 0.2; } 8% { opacity: 1; }
+  52% { opacity: 1; } 53% { opacity: 0.55; } 56% { opacity: 1; }
+}
+.flicker { animation: flicker 7s linear infinite; }
+
+/* ───────── tape strip ───────── */
+.tape {
+  position: absolute;
+  width: 84px; height: 24px;
+  background: oklch(85% 0.02 75 / 0.18);
+  border: 1px solid oklch(85% 0.02 75 / 0.12);
+  top: -11px; left: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+}
+
+/* ───────── price/size chips & buttons ───────── */
+.chip {
+  border: 1px solid var(--line-bright);
+  background: oklch(13% 0.006 50 / 0.55); /* own dark backing so it reads on the concrete wall */
+  color: var(--concrete-dim);
+  transition: color .2s, border-color .2s, background .2s;
+}
+.chip:hover { color: var(--concrete); border-color: var(--crimson); background: oklch(13% 0.006 50 / 0.72); }
+.chip[data-on="true"] {
+  color: var(--concrete);
+  border-color: var(--crimson);
+  background: oklch(48% 0.188 26 / 0.32);
+}
+
+/* swatch ring */
+.swatch[data-on="true"] { outline: 2px solid var(--crimson); outline-offset: 2px; }
+
+/* ───────── thin scrollbar (cart) ───────── */
+.thin-scroll::-webkit-scrollbar { width: 6px; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+.thin-scroll { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+/* ───────── form fields ───────── */
+.field {
+  background: var(--black);
+  border: 1px solid var(--line);
+  color: var(--concrete);
+  transition: border-color .2s;
+}
+.field::placeholder { color: var(--concrete-mut); }
+.field:focus { outline: none; border-color: var(--crimson); }
+.field[aria-invalid="true"] { border-color: var(--crimson-hi); }
+
+/* ───────── nav background once scrolled ───────── */
+#nav.nav-solid {
+  background: oklch(15.5% 0.006 50 / 0.82);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ───────── reveal helper (GSAP toggles) ───────── */
+.reveal { will-change: transform, opacity; }
+
+/* keyboard focus ring */
+:focus-visible { outline: 2px solid var(--crimson-hi); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .grain::after, .flicker { animation: none; }
+  .cursor-dot { display: none; }
 }
