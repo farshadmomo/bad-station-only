@@ -8,12 +8,14 @@ import { useGSAP } from "@gsap/react";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const LOOKS = [
-  { src: "/gallery/bad/bad-c-10.jpg", cap: "وستِ قرمز. تنها چیزِ گرمِ این‌جا." },
-  { src: "/gallery/bad/bad-c-00.jpg", cap: "ژاکتِ زبرا، جلوی دیوار." },
-  { src: "/gallery/bad/bad-a-13.jpg", cap: "شومیز و یه گلِ آفتابگردون. عکس بود، حسش نبود." },
-  { src: "/gallery/bad/bad-c-01.jpg", cap: "شنلِ شتری. دنیا رو نادیده بگیر." },
-  { src: "/gallery/bad/bad-c-11.jpg", cap: "شنلِ شب. قهوه تلخ بود." },
-  { src: "/gallery/bad/bad-c-13.jpg", cap: "وستِ سرمه‌ای. دستات تو جیب." },
+  { src: "/gallery/new/look-colors.jpg", cap: "همه‌ی رنگا، یه‌جا. انتخاب با تو، حسش با ما نیست." },
+  { src: "/gallery/new/look-linen-rack.jpg", cap: "رگالِ کتان. پنج تا رنگ، یه حالِ بد." },
+  { src: "/gallery/new/look-studio.jpg", cap: "صحنه چیده شد. ما نیومدیم تو قاب." },
+  { src: "/gallery/new/look-colors-2.jpg", cap: "از صورتی تا قهوه‌ای. تهش برامون خاکستریه." },
+  { src: "/gallery/new/look-scene-crates.jpg", cap: "تور و صندلی و صندوق. دکورِ بی‌حوصلگی." },
+  { src: "/gallery/new/look-corner.jpg", cap: "کفش و آباژور و سکوت. اینم گوشه‌ی ما." },
+  { src: "/gallery/new/look-trio.jpg", cap: "سه‌تا شومیز، کنارِ هم. مثلِ ما، بی‌حرف." },
+  { src: "/gallery/new/look-duo.jpg", cap: "آبی و قهوه‌ای. دو تا مود، هیچ‌کدوم خوب." },
 ];
 
 export default function Lookbook() {
@@ -60,7 +62,7 @@ export default function Lookbook() {
 
   return (
     <section id="looks" ref={root} className="relative overflow-hidden border-y border-line bg-black-2">
-      <div className="px-5 pt-16 sm:px-8 md:absolute md:top-10 md:right-8 md:z-10">
+      <div className="px-5 pt-16 sm:px-8 md:absolute md:top-20 md:right-8 md:z-10 md:pt-0">
         <div className="look-head">
           <p className="font-stamp text-sm tracking-[0.3em] text-crimson" dir="ltr">/ THE LOOKBOOK</p>
           <h2 className="mt-2 font-display text-4xl text-concrete sm:text-6xl">
@@ -72,7 +74,7 @@ export default function Lookbook() {
       {/* desktop strip / mobile grid */}
       <div
         dir="ltr"
-        className="look-rail flex flex-col gap-4 px-5 py-10 sm:px-8 md:h-dvh md:flex-row md:flex-nowrap md:items-center md:gap-6 md:py-0 md:pl-[40vw]"
+        className="look-rail flex flex-col gap-4 px-5 py-10 sm:px-8 md:h-dvh md:flex-row md:flex-nowrap md:items-end md:gap-6 md:py-0 md:pb-[6vh] md:pl-[40vw]"
         ref={track}
       >
         {LOOKS.map((l, i) => (
@@ -85,7 +87,7 @@ export default function Lookbook() {
               src={l.src}
               alt={l.cap}
               loading="lazy"
-              className="aspect-[3/4] w-full object-cover grayscale-[0.45] transition-all duration-700 hover:grayscale-0 md:h-[64vh] md:w-auto"
+              className="aspect-[3/4] w-full object-cover grayscale-[0.45] transition-all duration-700 hover:grayscale-0 md:h-[56vh] md:w-auto"
             />
             <figcaption dir="rtl" className="px-4 py-3 text-sm text-concrete-dim">{l.cap}</figcaption>
           </figure>
