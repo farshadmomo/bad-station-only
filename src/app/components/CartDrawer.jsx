@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useCart } from "./CartProvider";
 import { toman, fa } from "../lib/products";
-
-const SHIPPING = 90000;
+import { STATUS, SHIPPING } from "../lib/orders-shared";
 
 // normalise persian/arabic digits to latin for validation
 const normDigits = (s) =>
@@ -12,17 +12,19 @@ const normDigits = (s) =>
     .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
 
 export default function CartDrawer() {
-  const { items, count, subtotal, open, closeCart, setQty, remove, clear } = useCart();
-  const [stage, setStage] = useState("cart"); // cart | checkout | done
+  const { items, count, subtotal, open, closeCart, refresh } = useCart();
+  const [stage, setStage] = useState("cart"); // cart | checkout | payment | done
   const [form, setForm] = useState({ name: "", phone: "", address: "", note: "" });
+  const [card, setCard] = useState({ number: "", exp: "", cvv: "" });
   const [errors, setErrors] = useState({});
   const [order, setOrder] = useState(null);
-  const [copied, setCopied] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
   const panelRef = useRef(null);
 
   const total = subtotal + (items.length ? SHIPPING : 0);
 
-  // lock page scroll (Lenis) + Esc to close + focus panel
+  // lock page scroll + Esc to close + focus panel
   useEffect(() => {
     if (open) {
       window.__lenis?.stop?.();
@@ -37,55 +39,107 @@ export default function CartDrawer() {
     window.__lenis?.start?.();
   }, [open, closeCart]);
 
-  // reset to cart view shortly after closing
+  // reset to cart view shortly after closing (unless an order just landed)
   useEffect(() => {
     if (!open) {
       const t = setTimeout(() => {
-        if (stage !== "done") setStage("cart");
-        setErrors({});
+        if (stage !== "done") {
+          setStage("cart");
+          setErrors({});
+          setPayError("");
+        }
       }, 350);
       return () => clearTimeout(t);
     }
   }, [open, stage]);
+
+  // a fresh add after an order leaves the "done" confirmation behind — once a new
+  // item lands, swap back to the cart so reopening shows the new line (the "done"
+  // screen intentionally stays while the cart is still empty right after ordering)
+  useEffect(() => {
+    if (items.length > 0 && stage === "done") {
+      setStage("cart");
+      setOrder(null);
+    }
+  }, [items.length, stage]);
 
   const validate = () => {
     const e = {};
     if (form.name.trim().length < 2) e.name = "اسمت رو بنویس. لازمش داریم.";
     const phone = normDigits(form.phone).replace(/\D/g, "");
     if (!/^09\d{9}$/.test(phone)) e.phone = "شماره‌ی موبایل درست بده (۰۹...).";
-    if (form.address.trim().length < 8) e.address = "آدرسِ کامل‌تر. کجا بفرستیم؟";
+    if (form.address.trim().length < 8) e.address = "آدرسِ کامل‌تر بده. کجا بفرستیم؟";
     setErrors(e);
     if (Object.keys(e).length) {
-      const first = document.querySelector('[aria-invalid="true"]');
-      first?.focus();
+      setTimeout(() => document.querySelector('[aria-invalid="true"]')?.focus(), 0);
       return false;
     }
     return true;
   };
 
-  const submit = (ev) => {
+  const toPayment = (ev) => {
     ev.preventDefault();
     if (!validate()) return;
-    const code = "BAD-" + Math.random().toString(36).slice(2, 7).toUpperCase();
-    const lines = items
-      .map((l) => `• ${l.name} (${l.color}/${l.size}) ×${l.qty} = ${toman(l.qty * l.price)}`)
-      .join("\n");
-    const summary =
-      `سفارشِ بَد استیشن — کدِ ${code}\n${lines}\n` +
-      `ارسال: ${toman(SHIPPING)}\nجمع: ${toman(total)} تومان\n` +
-      `نام: ${form.name}\nموبایل: ${form.phone}\nآدرس: ${form.address}` +
-      (form.note ? `\nیادداشت: ${form.note}` : "");
-    setOrder({ code, summary });
-    setStage("done");
-    clear();
+    setPayError("");
+    setStage("payment");
   };
 
-  const copy = async () => {
+  const placeOrder = async () => {
+    setPaying(true);
+    setPayError("");
     try {
-      await navigator.clipboard.writeText(order.summary);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {}
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          customer_name: form.name.trim(),
+          phone: normDigits(form.phone).replace(/\D/g, ""),
+          address: form.address.trim(),
+          note: form.note.trim() || null,
+          items: items.map((l) => ({
+            id: l.id, name: l.name, color: l.color, size: l.size, qty: l.qty, price: l.price, img: l.img,
+          })),
+          subtotal,
+          shipping: SHIPPING,
+          total,
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || "یه چیزی این وسط بد شد. دوباره بزن.");
+      }
+      const data = await res.json();
+      // the order tx already emptied the cart server-side — pull that in BEFORE
+      // showing "done", so the "fresh add resets done→cart" effect (which keys off
+      // items.length>0) doesn't immediately fire on this order's own line.
+      await refresh();
+      setOrder(data);
+      setStage("done");
+    } catch (err) {
+      setPayError(err.message || "پرداخت ثبت نشد. دوباره امتحان کن.");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  // pretty card number: groups of 4
+  const onCardNumber = (v) => {
+    const digits = normDigits(v).replace(/\D/g, "").slice(0, 16);
+    setCard((c) => ({ ...c, number: digits.replace(/(.{4})/g, "$1 ").trim() }));
+  };
+
+  // empty-cart CTA: close the drawer, then head to the shop section
+  const goShop = () => {
+    closeCart();
+    // small delay so the close animation / scroll-unlock settles first
+    setTimeout(() => {
+      if (window.__lenis && document.getElementById("shop")) {
+        window.__lenis.scrollTo("#shop", { offset: -64, duration: 1.2 });
+      } else {
+        window.location.assign("/#shop");
+      }
+    }, 80);
   };
 
   return (
@@ -111,7 +165,7 @@ export default function CartDrawer() {
         {/* header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="font-display text-2xl text-concrete">
-            {stage === "done" ? "تمام شد" : "سبدِ خرید"}
+            {stage === "done" ? "ثبت شد" : stage === "payment" ? "پرداخت" : "سبدِ خرید"}
             {stage === "cart" && count > 0 && (
               <span className="mr-2 text-base text-concrete-dim">({fa(count)})</span>
             )}
@@ -128,49 +182,50 @@ export default function CartDrawer() {
 
         {/* body */}
         <div data-lenis-prevent className="thin-scroll flex-1 overflow-y-auto px-5 py-5">
-          {/* DONE */}
+          {/* DONE — order received */}
           {stage === "done" && order ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="font-display text-5xl text-crimson">✓</div>
-              <p className="mt-4 font-display text-2xl text-concrete">ثبت شد. کدت اینه:</p>
-              <p className="tnum mt-1 font-stamp text-3xl tracking-widest text-crimson" dir="ltr">
-                {order.code}
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-crimson text-3xl text-crimson">✓</div>
+              <p className="mt-5 font-display text-3xl text-concrete">سفارشت ثبت شد.</p>
+              <p className="mt-2 text-sm leading-7 text-concrete-dim">
+                {STATUS.received.voice} برات می‌فرستیمش.
               </p>
-              <p className="mt-4 text-sm leading-7 text-concrete-dim">
-                خلاصه‌ی سفارش رو کپی کن و برامون بفرست تا موجودی و زمانِ ارسال رو
-                تأیید کنیم. نگفتیم ذوق کن.
+
+              <div className="mt-6 w-full rounded-sm border border-line bg-black/40 p-4">
+                <p className="text-xs text-concrete-dim">کدِ پیگیری</p>
+                <p className="tnum mt-1 font-stamp text-3xl tracking-[0.3em] text-crimson" dir="ltr">
+                  {order.code}
+                </p>
+              </div>
+
+              <p className="mt-4 text-xs leading-6 text-concrete-dim">
+                این کد رو نگه دار. اگه واردِ حساب شده باشی، تو «سفارش‌های من» هم می‌بینیش
+                و قدم‌به‌قدم وضعیتش رو دنبال می‌کنی.
               </p>
+
+              <Link
+                href={`/track?code=${order.code}`}
+                onClick={closeCart}
+                data-hot
+                className="mt-5 min-h-11 w-full rounded-sm bg-crimson px-5 py-3 text-sm text-concrete transition-transform hover:-translate-y-0.5"
+              >
+                پیگیریِ سفارش
+              </Link>
               <button
-                onClick={copy}
+                onClick={() => { setStage("cart"); setOrder(null); closeCart(); }}
                 data-hot
-                className="mt-5 min-h-11 w-full rounded-sm bg-crimson px-5 text-sm text-concrete transition-transform hover:-translate-y-0.5"
+                className="mt-3 text-sm text-concrete-dim underline-offset-4 hover:underline"
               >
-                {copied ? "کپی شد. حالا بفرست." : "کپیِ خلاصه‌ی سفارش"}
-              </button>
-              <a
-                href="https://www.instagram.com/bad.staaation"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-hot
-                className="mt-3 min-h-11 w-full rounded-sm border border-line px-5 py-3 text-sm text-concrete transition-colors hover:border-[var(--line-bright)]"
-              >
-                دایرکتِ اینستاگرام ↗
-              </a>
-              <button
-                onClick={() => { setStage("cart"); closeCart(); }}
-                data-hot
-                className="mt-6 text-sm text-concrete-dim underline-offset-4 hover:underline"
-              >
-                باشه، رفتم.
+                باشه، رفتم خرید.
               </button>
             </div>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && stage !== "payment" ? (
             /* EMPTY */
             <div className="flex h-full flex-col items-center justify-center text-center">
               <p className="font-display text-3xl text-concrete">سبدت خالیه.</p>
-              <p className="mt-2 text-sm text-concrete-dim">مثلِ باتریِ اجتماعیِ ما.</p>
+              <p className="mt-2 text-sm text-concrete-dim">بریز توش، بد می‌چسبه.</p>
               <button
-                onClick={closeCart}
+                onClick={goShop}
                 data-hot
                 className="mt-6 min-h-11 rounded-sm border border-crimson px-6 text-sm text-concrete transition-colors hover:bg-crimson"
               >
@@ -181,57 +236,16 @@ export default function CartDrawer() {
             /* CART LINES */
             <ul className="space-y-4">
               {items.map((l) => (
-                <li key={l.key} className="flex gap-3 border-b border-line pb-4">
-                  <img src={l.img} alt="" className="h-24 w-20 shrink-0 object-cover border border-line" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-display text-lg leading-tight text-concrete">{l.name}</h3>
-                      <button
-                        onClick={() => remove(l.key)}
-                        data-hot
-                        aria-label={`حذفِ ${l.name}`}
-                        className="shrink-0 text-xs text-concrete-dim hover:text-crimson"
-                      >
-                        حذف
-                      </button>
-                    </div>
-                    <p className="mt-0.5 text-xs text-concrete-dim">
-                      {l.color} · سایز <span dir="ltr">{l.size}</span>
-                    </p>
-                    <div className="mt-auto flex items-center justify-between pt-2">
-                      {/* qty stepper */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setQty(l.key, l.qty - 1)}
-                          data-hot
-                          aria-label="یکی کمتر"
-                          className="flex h-8 w-8 items-center justify-center rounded-sm border border-line text-concrete hover:border-[var(--line-bright)]"
-                        >
-                          −
-                        </button>
-                        <span className="tnum w-6 text-center text-sm text-concrete">{fa(l.qty)}</span>
-                        <button
-                          onClick={() => setQty(l.key, Math.min(l.qty + 1, 9))}
-                          data-hot
-                          aria-label="یکی بیشتر"
-                          className="flex h-8 w-8 items-center justify-center rounded-sm border border-line text-concrete hover:border-[var(--line-bright)]"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <span className="tnum text-sm text-concrete-dim">{toman(l.qty * l.price)}</span>
-                    </div>
-                  </div>
-                </li>
+                <CartLine key={l.key} l={l} />
               ))}
             </ul>
-          ) : (
+          ) : stage === "checkout" ? (
             /* CHECKOUT FORM */
-            <form id="checkout-form" onSubmit={submit} noValidate className="space-y-4">
+            <form id="checkout-form" onSubmit={toPayment} noValidate className="space-y-4">
               <Field
                 label="اسمت" id="cf-name" value={form.name} error={errors.name}
                 onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-                placeholder="مثلاً: یه آدمِ بی‌حوصله"
+                placeholder="مثلاً: یه آدمِ خوش‌سلیقه"
               />
               <Field
                 label="موبایل" id="cf-phone" value={form.phone} error={errors.phone}
@@ -249,24 +263,80 @@ export default function CartDrawer() {
                 placeholder="اگه حرفِ خاصی هست…" optional
               />
             </form>
+          ) : (
+            /* PAYMENT — demo portal (no real gateway yet) */
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-sm border border-line bg-black/40 px-4 py-3">
+                <span className="text-sm text-concrete-dim">مبلغِ قابلِ پرداخت</span>
+                <span className="tnum font-display text-xl text-crimson">{toman(total)} تومان</span>
+              </div>
+
+              <div className="rounded-md border border-line bg-black-2 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="stencil text-xs text-concrete-dim" dir="ltr">SECURE PAY</span>
+                  <span className="rounded-sm border border-line px-2 py-0.5 text-[11px] text-concrete-dim">نمونه</span>
+                </div>
+
+                <label className="mb-1.5 block text-sm text-concrete">شماره‌ی کارت</label>
+                <input
+                  value={card.number}
+                  onChange={(e) => onCardNumber(e.target.value)}
+                  inputMode="numeric" dir="ltr"
+                  placeholder="۶۰۳۷ ۹۹۷۵ ۰۰۰۰ ۰۰۰۰"
+                  className="field tnum min-h-11 w-full rounded-sm px-3 text-base tracking-widest"
+                />
+
+                <div className="mt-3 flex gap-3">
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-sm text-concrete">انقضا</label>
+                    <input
+                      value={card.exp}
+                      onChange={(e) => setCard((c) => ({ ...c, exp: normDigits(e.target.value).replace(/[^\d/]/g, "").slice(0, 5) }))}
+                      inputMode="numeric" dir="ltr" placeholder="۰۴/۰۸"
+                      className="field tnum min-h-11 w-full rounded-sm px-3 text-base"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-1.5 block text-sm text-concrete">CVV2</label>
+                    <input
+                      value={card.cvv}
+                      onChange={(e) => setCard((c) => ({ ...c, cvv: normDigits(e.target.value).replace(/\D/g, "").slice(0, 4) }))}
+                      inputMode="numeric" dir="ltr" placeholder="۱۲۳"
+                      className="field tnum min-h-11 w-full rounded-sm px-3 text-base"
+                    />
+                  </div>
+                </div>
+
+                <p className="mt-3 text-xs leading-6 text-concrete-dim">
+                  این یه درگاهِ نمونه‌ست؛ هیچ پولی واقعاً کسر نمی‌شه. درگاهِ بانکیِ واقعی
+                  بعداً وصل می‌شه. بزن «پرداخت» تا سفارشت ثبت شه.
+                </p>
+              </div>
+
+              {payError && <p role="alert" className="text-sm text-crimson">{payError}</p>}
+            </div>
           )}
         </div>
 
         {/* footer / totals */}
-        {stage !== "done" && items.length > 0 && (
+        {(stage === "cart" || stage === "checkout" || stage === "payment") && items.length > 0 && (
           <div className="border-t border-line px-5 py-4">
-            <div className="flex justify-between text-sm text-concrete-dim">
-              <span>جمعِ کالاها</span>
-              <span className="tnum">{toman(subtotal)} تومان</span>
-            </div>
-            <div className="mt-1 flex justify-between text-sm text-concrete-dim">
-              <span>ارسال</span>
-              <span className="tnum">{toman(SHIPPING)} تومان</span>
-            </div>
-            <div className="mt-2 flex justify-between border-t border-line pt-2 font-display text-xl text-concrete">
-              <span>جمعِ کل</span>
-              <span className="tnum text-crimson">{toman(total)} تومان</span>
-            </div>
+            {stage !== "payment" && (
+              <>
+                <div className="flex justify-between text-sm text-concrete-dim">
+                  <span>جمعِ کالاها</span>
+                  <span className="tnum">{toman(subtotal)} تومان</span>
+                </div>
+                <div className="mt-1 flex justify-between text-sm text-concrete-dim">
+                  <span>ارسال</span>
+                  <span className="tnum">{toman(SHIPPING)} تومان</span>
+                </div>
+                <div className="mt-2 flex justify-between border-t border-line pt-2 font-display text-xl text-concrete">
+                  <span>جمعِ کل</span>
+                  <span className="tnum text-crimson">{toman(total)} تومان</span>
+                </div>
+              </>
+            )}
 
             {stage === "cart" ? (
               <button
@@ -276,7 +346,7 @@ export default function CartDrawer() {
               >
                 نهایی کردنِ سفارش
               </button>
-            ) : (
+            ) : stage === "checkout" ? (
               <div className="mt-4 flex gap-3">
                 <button
                   type="button"
@@ -292,7 +362,28 @@ export default function CartDrawer() {
                   data-hot
                   className="min-h-12 flex-1 rounded-sm bg-crimson px-5 text-base text-concrete transition-transform hover:-translate-y-0.5"
                 >
-                  ثبتِ نهایی
+                  ادامه به پرداخت
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStage("checkout")}
+                  disabled={paying}
+                  data-hot
+                  className="min-h-12 rounded-sm border border-line px-5 text-sm text-concrete hover:border-[var(--line-bright)] disabled:opacity-50"
+                >
+                  برگرد
+                </button>
+                <button
+                  type="button"
+                  onClick={placeOrder}
+                  disabled={paying}
+                  data-hot
+                  className="min-h-12 flex-1 rounded-sm bg-crimson px-5 text-base text-concrete transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+                >
+                  {paying ? "داریم ثبت می‌کنیم…" : `پرداختِ ${toman(total)} تومان`}
                 </button>
               </div>
             )}
@@ -300,6 +391,92 @@ export default function CartDrawer() {
         )}
       </aside>
     </>
+  );
+}
+
+// one cart line: editable colour + size (re-checks stock on change) and a qty stepper.
+function CartLine({ l }) {
+  const { setQty, setVariant, remove } = useCart();
+  const [err, setErr] = useState("");
+  const out = l.available <= 0;
+
+  const run = async (p) => {
+    const r = await p;
+    setErr(r?.error || "");
+  };
+
+  return (
+    <li className="flex gap-3 border-b border-line pb-4">
+      <img src={l.img} alt="" className="h-24 w-20 shrink-0 border border-line object-cover" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-display text-lg leading-tight text-concrete">{l.name}</h3>
+          <button
+            onClick={() => remove(l.key)}
+            data-hot
+            aria-label={`حذفِ ${l.name}`}
+            className="shrink-0 text-xs text-concrete-dim hover:text-crimson"
+          >
+            حذف
+          </button>
+        </div>
+
+        {/* colour + size pickers — changing one re-reserves against stock */}
+        <div className="mt-1.5 flex gap-2">
+          {l.colors.length > 1 ? (
+            <select
+              value={l.color ?? ""}
+              onChange={(e) => run(setVariant(l.key, { color: e.target.value }))}
+              aria-label="رنگ"
+              className="field min-h-8 flex-1 rounded-sm px-2 text-xs text-concrete"
+            >
+              {l.colors.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-concrete-dim">{l.color}</span>
+          )}
+          {l.sizes.length > 1 ? (
+            <select
+              value={l.size ?? ""}
+              onChange={(e) => run(setVariant(l.key, { size: e.target.value }))}
+              aria-label="سایز"
+              dir="ltr"
+              className="field min-h-8 flex-1 rounded-sm px-2 text-xs text-concrete"
+            >
+              {l.sizes.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs text-concrete-dim">سایز <span dir="ltr">{l.size}</span></span>
+          )}
+        </div>
+
+        <div className="mt-auto flex items-center justify-between pt-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => run(setQty(l.key, l.qty - 1))}
+              data-hot aria-label="یکی کمتر"
+              className="flex h-8 w-8 items-center justify-center rounded-sm border border-line text-concrete hover:border-[var(--line-bright)]"
+            >−</button>
+            <span className="tnum w-6 text-center text-sm text-concrete">{fa(l.qty)}</span>
+            <button
+              onClick={() => run(setQty(l.key, l.qty + 1))}
+              disabled={l.qty >= l.available}
+              data-hot aria-label="یکی بیشتر"
+              className="flex h-8 w-8 items-center justify-center rounded-sm border border-line text-concrete hover:border-[var(--line-bright)] disabled:opacity-40"
+            >+</button>
+          </div>
+          <span className="tnum text-sm text-concrete-dim">{toman(l.qty * l.price)}</span>
+        </div>
+
+        {(err || out) && (
+          <p role="alert" className="mt-1 text-xs text-crimson">{err || "ناموجود"}</p>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -311,29 +488,20 @@ function Field({ label, id, value, onChange, error, placeholder, textarea, optio
       </label>
       {textarea ? (
         <textarea
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          aria-invalid={!!error}
-          rows={3}
-          placeholder={placeholder}
+          id={id} value={value} onChange={(e) => onChange(e.target.value)}
+          aria-invalid={!!error} rows={3} placeholder={placeholder}
           className="field w-full resize-none rounded-sm px-3 py-2.5 text-sm"
           {...rest}
         />
       ) : (
         <input
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          aria-invalid={!!error}
-          placeholder={placeholder}
+          id={id} value={value} onChange={(e) => onChange(e.target.value)}
+          aria-invalid={!!error} placeholder={placeholder}
           className="field min-h-11 w-full rounded-sm px-3 text-sm"
           {...rest}
         />
       )}
-      {error && (
-        <p role="alert" className="mt-1 text-xs text-crimson">{error}</p>
-      )}
+      {error && <p role="alert" className="mt-1 text-xs text-crimson">{error}</p>}
     </div>
   );
 }

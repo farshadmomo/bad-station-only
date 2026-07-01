@@ -8,14 +8,14 @@ import { useGSAP } from "@gsap/react";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const LOOKS = [
-  { src: "/gallery/new/look-colors.jpg", cap: "همه‌ی رنگا، یه‌جا. انتخاب با تو، حسش با ما نیست." },
-  { src: "/gallery/new/look-linen-rack.jpg", cap: "رگالِ کتان. پنج تا رنگ، یه حالِ بد." },
-  { src: "/gallery/new/look-studio.jpg", cap: "صحنه چیده شد. ما نیومدیم تو قاب." },
-  { src: "/gallery/new/look-colors-2.jpg", cap: "از صورتی تا قهوه‌ای. تهش برامون خاکستریه." },
-  { src: "/gallery/new/look-scene-crates.jpg", cap: "تور و صندلی و صندوق. دکورِ بی‌حوصلگی." },
-  { src: "/gallery/new/look-corner.jpg", cap: "کفش و آباژور و سکوت. اینم گوشه‌ی ما." },
-  { src: "/gallery/new/look-trio.jpg", cap: "سه‌تا شومیز، کنارِ هم. مثلِ ما، بی‌حرف." },
-  { src: "/gallery/new/look-duo.jpg", cap: "آبی و قهوه‌ای. دو تا مود، هیچ‌کدوم خوب." },
+  { src: "/gallery/new/look-colors.jpg", cap: "همه‌ی رنگا یه‌جا. هرکدوم رو بزنی، بد در میای." },
+  { src: "/gallery/new/look-linen-rack.jpg", cap: "رگالِ کتان. پنج رنگ، یه حسِ خفن." },
+  { src: "/gallery/new/look-studio.jpg", cap: "صحنه چیده‌ست. فقط جای تو خالیه." },
+  { src: "/gallery/new/look-colors-2.jpg", cap: "از صورتی تا قهوه‌ای. هر رنگی بخوای، بد هست." },
+  { src: "/gallery/new/look-scene-crates.jpg", cap: "تور و صندوق و نور. ست‌مون بد می‌شینه." },
+  { src: "/gallery/new/look-corner.jpg", cap: "کفش و آباژور و یه گوشه‌ی خفن." },
+  { src: "/gallery/new/look-trio.jpg", cap: "سه تا شومیز کنارِ هم. بد ترکیب می‌شن." },
+  { src: "/gallery/new/look-duo.jpg", cap: "آبی و قهوه‌ای. دو تا حال، هر دو بد خوب." },
 ];
 
 export default function Lookbook() {
@@ -64,9 +64,9 @@ export default function Lookbook() {
     <section id="looks" ref={root} className="relative overflow-hidden border-y border-line bg-black-2">
       <div className="px-5 pt-16 sm:px-8 md:absolute md:top-20 md:right-8 md:z-10 md:pt-0">
         <div className="look-head">
-          <p className="font-stamp text-sm tracking-[0.3em] text-crimson" dir="ltr">/ THE LOOKBOOK</p>
+          <p className="stencil spray-soft text-sm text-crimson" dir="ltr">/ THE LOOKBOOK</p>
           <h2 className="mt-2 font-display text-4xl text-concrete sm:text-6xl">
-            دیده‌شدن، <span className="text-crimson">به اجبار</span>
+            دیده می‌شی، <span className="text-crimson">بدجور</span>
           </h2>
         </div>
       </div>

@@ -64,10 +64,10 @@ body::before {
   pointer-events: none;
   background-color: var(--black);
   background-image:
-    radial-gradient(ellipse 120% 75% at 50% -8%, oklch(36% 0.014 60 / 0.3), transparent 58%),
-    radial-gradient(ellipse 110% 85% at 50% 115%, oklch(7% 0.005 50 / 0.78), transparent 60%),
-    linear-gradient(oklch(20% 0.009 54 / 0.46), oklch(15% 0.007 50 / 0.62)),
-    url("/texture/concrete.jpg");
+    radial-gradient(ellipse 120% 75% at 50% -8%, oklch(36% 0.014 60 / 0.28), transparent 58%),
+    radial-gradient(ellipse 110% 85% at 50% 115%, oklch(6% 0.005 50 / 0.82), transparent 60%),
+    linear-gradient(oklch(17% 0.009 54 / 0.7), oklch(12% 0.007 50 / 0.82)),
+    url("/background/phil-cruz-AehBpEOj6SI-unsplash.jpg");
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -101,8 +101,8 @@ body::before {
   background-color: var(--black-2);
   background-image:
     radial-gradient(ellipse 90% 55% at 50% 0%, oklch(30% 0.012 58 / 0.5), transparent 60%),
-    linear-gradient(oklch(19% 0.008 52 / 0.76), oklch(14% 0.007 50 / 0.86)),
-    url("/texture/concrete.jpg");
+    linear-gradient(oklch(17% 0.008 52 / 0.82), oklch(12% 0.007 50 / 0.9)),
+    url("/background/phil-cruz-AehBpEOj6SI-unsplash.jpg");
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -216,6 +216,125 @@ body::before {
 
 /* keyboard focus ring */
 :focus-visible { outline: 2px solid var(--crimson-hi); outline-offset: 2px; }
+
+/* ───────── spray-paint typography (the signature) ─────────
+   roughens glyph edges via an SVG turbulence/displacement filter
+   defined once in layout. NOT gradient text — real stencil bleed.
+   use with restraint: wordmark, eyebrows, a few display lines. */
+.spray { filter: url(#bad-spray); }
+.spray-soft { filter: url(#bad-spray-soft); }
+
+/* faint crimson overspray mist sitting behind a sprayed wordmark */
+.spray-halo { position: relative; }
+.spray-halo::before {
+  content: "";
+  position: absolute;
+  inset: -18% -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 38% 46% at 30% 42%, oklch(48% 0.188 26 / 0.22), transparent 70%),
+    radial-gradient(ellipse 30% 40% at 72% 58%, oklch(48% 0.188 26 / 0.16), transparent 72%);
+  filter: blur(14px) url(#bad-spray-soft);
+}
+
+/* stencil eyebrow — sprayed stamp label */
+.stencil {
+  font-family: var(--font-stamp), var(--font-display), sans-serif;
+  letter-spacing: 0.32em;
+}
+
+/* ── sprayed word + paint drips (like the «بَد» logo) ──
+   <Sprayed> wraps a word: roughened glyphs + drips hanging off the
+   bottom. drips use em units so they scale with the word's size and
+   inherit currentColor so they match the text. */
+.sprayed { position: relative; display: inline-block; }
+/* text sits above the drips so each drip's top tucks behind the letters */
+.sprayed > .ink { position: relative; z-index: 1; filter: url(#bad-spray); }
+/* real paint-drip shape (public/drips) masked in currentColor, so each drip
+   matches the text it hangs from. per-drip shape via the --drip custom prop;
+   size via inline width/height. top overlaps the text bottom (behind it) so the
+   drip reads as flowing out of the letters, not floating below them. */
+.spray-drip {
+  position: absolute;
+  top: 70%;
+  z-index: 0;
+  background: currentColor;
+  -webkit-mask: var(--drip, url("/drips/drip-1.png")) top center / contain no-repeat;
+  mask: var(--drip, url("/drips/drip-1.png")) top center / contain no-repeat;
+  transform-origin: top center;
+  pointer-events: none;
+  will-change: transform;
+}
+/* the footer wordmark drips are positioned for the single-line tagline; below md
+   it wraps to two lines and the positions no longer line up, so hide them there. */
+@media (max-width: 767px) {
+  .spray-drip { display: none; }
+}
+
+/* ── BadLogo — «بَد» wordmark PNG painted in concrete via mask ──
+   box = the mark's tight content bbox (measured from the PNG: x 21.3–73.8%,
+   y 13.5–70.9%) so there's no dead space. the masked layer oversizes +
+   offsets to align the full square PNG's content to the box edges. the
+   crimson diamond + drips are positioned in % of the box, so they track
+   the mark at every size and never break on resize. */
+.bad-logo {
+  position: relative;
+  display: inline-block;
+  aspect-ratio: 525 / 574;
+  line-height: 0;
+  vertical-align: middle;
+  overflow: visible;
+  color: inherit;
+}
+.bad-logo-mark {
+  position: absolute;
+  left: -40.6%;
+  top: -23.5%;
+  width: 190.5%;
+  height: 174.2%;
+  background-color: var(--concrete);
+  -webkit-mask: url("/logo/bad-png-logo-whitout-background.png") center / contain no-repeat;
+  mask: url("/logo/bad-png-logo-whitout-background.png") center / contain no-repeat;
+}
+/* brand red, restored where the PNG's dot sits (img 64.2%,~60% → box) */
+.bad-logo-diamond {
+  position: absolute;
+  left: 81.7%;
+  top: 82%;
+  width: 18%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--crimson);
+  border-radius: 16%;
+  filter: url(#bad-spray-soft);
+  pointer-events: none;
+}
+/* the dot's paint run, revealed from the logo art itself (its own red drip),
+   painted crimson. same transform as .bad-logo-mark so it lines up exactly;
+   clipped to just the run below the dot (no letters, no bg). */
+.bad-logo-dot-drip {
+  position: absolute;
+  left: -40.6%;
+  top: -23.5%;
+  width: 190.5%;
+  height: 174.2%;
+  background: var(--crimson);
+  -webkit-mask: url("/logo/bad-png-logo-whitout-background.png") center / contain no-repeat;
+  mask: url("/logo/bad-png-logo-whitout-background.png") center / contain no-repeat;
+  -webkit-clip-path: inset(63% 33% 25% 60%);
+  clip-path: inset(63% 33% 25% 60%);
+  pointer-events: none;
+}
+.bad-drip {
+  position: absolute;
+  top: 58%;
+  fill: var(--crimson);
+  filter: url(#bad-spray-soft);
+  pointer-events: none;
+  overflow: visible;
+  will-change: transform;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .grain::after, .flicker { animation: none; }

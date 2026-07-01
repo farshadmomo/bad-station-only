@@ -1,62 +1,89 @@
 "use client";
 
-import { createContext, useContext, useEffect, useReducer, useRef, useState } from "react";
+import { createContext, useContext, useCallback, useEffect, useState } from "react";
 
 const CartCtx = createContext(null);
-const KEY = "bad-cart-v1";
 
-// each line is unique per product + size + color
-const lineId = (p) => `${p.id}__${p.size}__${p.color}`;
-
-function reducer(state, action) {
-  switch (action.type) {
-    case "hydrate":
-      return action.items;
-    case "add": {
-      const id = lineId(action.line);
-      const found = state.find((l) => l.key === id);
-      if (found) {
-        return state.map((l) =>
-          l.key === id ? { ...l, qty: Math.min(l.qty + action.line.qty, 9) } : l
-        );
-      }
-      return [...state, { ...action.line, key: id }];
-    }
-    case "qty":
-      return state
-        .map((l) => (l.key === action.key ? { ...l, qty: action.qty } : l))
-        .filter((l) => l.qty > 0);
-    case "remove":
-      return state.filter((l) => l.key !== action.key);
-    case "clear":
-      return [];
-    default:
-      return state;
-  }
+// thin wrapper over /api/cart; returns { ok, status, data }
+async function api(method, body, query = "") {
+  const res = await fetch("/api/cart" + query, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    credentials: "same-origin",
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
 }
 
 export function CartProvider({ children }) {
-  const [items, dispatch] = useReducer(reducer, []);
+  const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [bump, setBump] = useState(0); // increments to trigger badge pop
-  const firstPersist = useRef(true); // skip the initial write so we don't clobber stored cart
 
-  // hydrate from localStorage once
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) dispatch({ type: "hydrate", items: JSON.parse(raw) });
-    } catch {}
+  const apply = (data) => Array.isArray(data?.items) && setItems(data.items);
+
+  // pull the server cart (mount + whenever the tab regains focus — a login/logout
+  // elsewhere means the merged/owned cart shows up on the next focus)
+  const refresh = useCallback(async () => {
+    const { ok, data } = await api("GET");
+    if (ok) apply(data);
   }, []);
 
-  // persist (skip first run — that's the pre-hydration empty state)
   useEffect(() => {
-    if (firstPersist.current) {
-      firstPersist.current = false;
-      return;
+    refresh();
+    const onFocus = () => refresh();
+    // visibilitychange fires on tab/app return even when `focus` doesn't (tab was
+    // backgrounded, laptop slept) — so a still-valid server cart re-appears on return.
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh]);
+
+  // each mutation returns the fresh cart → set it straight from the response.
+  // callers get { ok } or { error } (the stock/availability message).
+  const add = useCallback(async (line) => {
+    const { ok, data } = await api("POST", {
+      id: line.id,
+      color: line.color,
+      size: line.size,
+      qty: line.qty ?? 1,
+    });
+    if (ok) {
+      apply(data);
+      setBump((b) => b + 1);
+      return { ok: true };
     }
-    localStorage.setItem(KEY, JSON.stringify(items));
-  }, [items]);
+    return { error: data?.error || "نشد. دوباره بزن." };
+  }, []);
+
+  const setQty = useCallback(async (key, qty) => {
+    const { ok, data } = await api("PATCH", { key, qty });
+    if (ok) apply(data);
+    return ok ? { ok: true } : { error: data?.error || "نشد." };
+  }, []);
+
+  const setVariant = useCallback(async (key, patch) => {
+    const { ok, data } = await api("PATCH", { key, ...patch });
+    if (ok) apply(data);
+    return ok ? { ok: true } : { error: data?.error || "ناموجود" };
+  }, []);
+
+  const remove = useCallback(async (key) => {
+    const { ok, data } = await api("DELETE", { key });
+    if (ok) apply(data);
+    return { ok };
+  }, []);
+
+  const clear = useCallback(async () => {
+    const { ok, data } = await api("DELETE", null, "?all=1");
+    if (ok) apply(data);
+    return { ok };
+  }, []);
 
   const count = items.reduce((n, l) => n + l.qty, 0);
   const subtotal = items.reduce((n, l) => n + l.qty * l.price, 0);
@@ -69,13 +96,12 @@ export function CartProvider({ children }) {
     bump,
     openCart: () => setOpen(true),
     closeCart: () => setOpen(false),
-    add: (line) => {
-      dispatch({ type: "add", line });
-      setBump((b) => b + 1);
-    },
-    setQty: (key, qty) => dispatch({ type: "qty", key, qty }),
-    remove: (key) => dispatch({ type: "remove", key }),
-    clear: () => dispatch({ type: "clear" }),
+    add,
+    setQty,
+    setVariant,
+    remove,
+    clear,
+    refresh,
   };
 
   return <CartCtx.Provider value={value}>{children}</CartCtx.Provider>;

@@ -9,14 +9,14 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const ORDER_STEPS = [
   "محصولی که چشمت رو گرفت، بریز تو سبدِ خرید.",
-  "سایز و رنگش رو همون‌جا انتخاب کن.",
-  "سبد رو نهایی کن؛ اسم و آدرس و شماره‌ت رو بده.",
-  "ما موجودی، قیمت و زمانِ ارسال رو تأیید می‌کنیم. تمام.",
+  "تو صفحه‌ی محصول سایز و رنگش رو انتخاب کن.",
+  "سبد رو نهایی کن؛ اسم و آدرس و شماره‌ت رو بده و پرداخت کن.",
+  "یه کدِ پیگیری می‌گیری و قدم‌به‌قدم می‌بینی سفارشت کجاست.",
 ];
 
 export default function About() {
   const root = useRef(null);
-  const [cta, setCta] = useState("دایرکت بده. باشه؟");
+  const [cta, setCta] = useState("بزن تو دایرکت");
 
   useGSAP(
     () => {
@@ -50,12 +50,12 @@ export default function About() {
             درباره‌ی بَد!
           </span>
           <p className="text-lg leading-10 text-concrete">
-            یه تیمِ کوچیکیم که «بد» براش همه‌چیز بود: جنس و دوامِ پارچه،
-            ارزش‌گذاریِ محصولات، طرح، رنگ و جدیتِ کار. سعی کردیم توی هر تیکه،
-            غیابِ سهل‌انگاری معلوم باشه.
+            یه تیمِ کوچیکیم که «بد» براش همه‌چی بود: جنس و دوامِ پارچه، قیمتِ
+            منصف، طرح، رنگ و جدیتِ کار. تو هر تیکه تلاش کردیم چیزی کم نذاریم؛ که
+            وقتی می‌پوشیش، حسِ خوبی بهت بده. حسِ بد.
           </p>
           <p className="mt-6 font-display text-2xl text-crimson">
-            «بد» خوب‌ترین رویایی بود که داشتیم. اسمش رو ازمون نگیرین.
+            «بد» قشنگ‌ترین اسمی بود که می‌تونستیم بذاریم. اسمش بده، خودش بد خوبه.
           </p>
           <p className="mt-8 text-left text-sm text-concrete-dim">
             دوست‌دارِ شما،
@@ -89,13 +89,13 @@ export default function About() {
             target="_blank"
             rel="noopener noreferrer"
             data-hot
-            onMouseEnter={() => setCta("حالا حتماً؟ …باشه بده.")}
-            onMouseLeave={() => setCta("دایرکت بده. باشه؟")}
+            onMouseEnter={() => setCta("بزن دیگه، منتظریم")}
+            onMouseLeave={() => setCta("بزن تو دایرکت")}
             className="rounded-sm bg-crimson px-8 py-3.5 text-base text-concrete transition-transform hover:-translate-y-1"
           >
             {cta}
           </a>
-          <span className="text-sm text-concrete-dim">ارسال هم داریم؛ به همه‌جای ایرانمون 🧿</span>
+          <span className="text-sm text-concrete-dim">ارسال هم داریم؛ به همه‌جای ایرانمون.</span>
         </div>
       </div>
 
@@ -103,11 +103,10 @@ export default function About() {
       <div className="mx-auto max-w-4xl px-5 pb-28 text-center sm:px-8">
         <h2 className="bad-rise font-display text-4xl text-concrete sm:text-5xl">کجاییم؟!</h2>
         <p className="bad-rise mt-5 text-lg leading-9 text-concrete-dim">
-          خیابان ویلا (نجات‌اللهی)، نبشِ اراک —{" "}
+          خیابان ویلا (نجات‌اللهی)، نبشِ اراک؛{" "}
           <strong className="text-concrete">طبقه‌ی دومِ «اون بالا».</strong>
           <br />
-          آره، باید از وسطِ آدم‌های خوشحالِ کافه رد شی. متاسفیم.
-          <span className="opacity-60"> (نیستیم.)</span>
+          از وسطِ کافه و آدمای خوشحالش رد شو، بیا بالا. بد می‌ارزه.
         </p>
         <a
           href="https://maps.app.goo.gl/5EB5dazsyPi3ZmC17?g_st=ac"
